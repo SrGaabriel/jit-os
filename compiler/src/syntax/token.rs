@@ -9,21 +9,19 @@ pub struct Token<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
+    Identifier,
     Number,
     String,
+    Equal,
+    Struct,
+    Comma,
+    Colon,
+    LBrace,
+    RBrace,
+    LParen,
+    RParen,
+    Semicolon,
     EndOfFile,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LexError<'a> {
-    pub kind: LexErrorKind,
-    pub span: SourceSpan,
-    pub lexeme: &'a [u8],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LexErrorKind {
-    UnexpectedChar(char),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

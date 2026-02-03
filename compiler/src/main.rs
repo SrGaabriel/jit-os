@@ -26,7 +26,11 @@ pub extern "C" fn _start() -> i32 {
         println!("Tokens:");
         for result in lexer {
             match result {
-                Ok(token) => println!("{:?}", token),
+                Ok(token) => println!(
+                    "{} - {:?}",
+                    str::from_utf8(token.lexeme).unwrap(),
+                    token.kind
+                ),
                 Err(err) => println!("Error: {:?}", err),
             }
         }

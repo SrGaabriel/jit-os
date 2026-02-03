@@ -3,5 +3,3 @@ struct Vec {r : Region} {T : Type} (n : Nat) {
 }
 
 def index {n : Nat} (s : Vec n) : Nat = n
-
-5

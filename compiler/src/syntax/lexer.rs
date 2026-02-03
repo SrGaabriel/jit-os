@@ -1,7 +1,24 @@
 use crate::syntax::{
     SourceFile, SourcePos, SourceSpan,
-    token::{LexError, LexErrorKind, Token, TokenKind},
+    error::{SyntacticError, SyntacticErrorKind},
+    token::{Token, TokenKind},
 };
+
+fn decode_utf8_char(bytes: &[u8]) -> Option<char> {
+    if bytes.is_empty() {
+        return None;
+    }
+    let s = core::str::from_utf8(bytes).ok()?;
+    s.chars().next()
+}
+
+fn is_ident_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+fn is_ident_continue(c: char) -> bool {
+    c.is_alphabetic() || c.is_ascii_digit() || c == '_'
+}
 
 pub struct Lexer<'a> {
     source_file: &'a SourceFile<'a>,
@@ -31,7 +48,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, LexError<'a>>;
+    type Item = Result<Token<'a>, SyntacticError<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let source = &self.source_file.source;
@@ -40,18 +57,20 @@ impl<'a> Iterator for Lexer<'a> {
             if self.source_pos.byte_offset >= source.len() {
                 return None;
             }
-            let current = source[self.source_pos.byte_offset] as char;
-            match current {
-                ' ' | '\t' | '\r' => self.source_pos.row(),
-                '\n' => self.source_pos.newline(),
+            let b = source[self.source_pos.byte_offset];
+            match b {
+                b' ' | b'\t' | b'\r' => self.source_pos.row(),
+                b'\n' => self.source_pos.newline(),
                 _ => break,
             }
         }
 
-        let current = source[self.source_pos.byte_offset] as char;
+        let remaining = &source[self.source_pos.byte_offset..];
+        let current = decode_utf8_char(remaining)?;
+        let start = self.source_pos;
+
         match current {
             '0'..='9' => {
-                let start = self.source_pos;
                 while self.source_pos.byte_offset < source.len() {
                     let c = source[self.source_pos.byte_offset] as char;
                     if c.is_ascii_digit() {
@@ -71,8 +90,35 @@ impl<'a> Iterator for Lexer<'a> {
                     },
                 }))
             }
+            c if is_ident_start(c) => {
+                while self.source_pos.byte_offset < source.len() {
+                    let remaining = &source[self.source_pos.byte_offset..];
+                    if let Some(c) = decode_utf8_char(remaining) {
+                        if is_ident_continue(c) {
+                            self.source_pos.advance_by_char(c);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                let kind = match lexeme {
+                    b"struct" => TokenKind::Struct,
+                    _ => TokenKind::Identifier,
+                };
+
+                Some(Ok(Token {
+                    kind,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
             '"' => {
-                let start = self.source_pos;
                 self.source_pos.row();
                 while self.source_pos.byte_offset < source.len() {
                     let c = source[self.source_pos.byte_offset] as char;
@@ -94,12 +140,109 @@ impl<'a> Iterator for Lexer<'a> {
                     },
                 }))
             }
-            u => {
-                let start = self.source_pos;
+            '=' => {
                 self.source_pos.row();
                 let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
-                Some(Err(LexError {
-                    kind: LexErrorKind::UnexpectedChar(u),
+
+                Some(Ok(Token {
+                    kind: TokenKind::Equal,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            ',' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+
+                Some(Ok(Token {
+                    kind: TokenKind::Comma,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            ':' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Ok(Token {
+                    kind: TokenKind::Colon,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            '{' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Ok(Token {
+                    kind: TokenKind::LBrace,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            '}' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Ok(Token {
+                    kind: TokenKind::RBrace,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            '(' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Ok(Token {
+                    kind: TokenKind::LParen,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            ')' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Ok(Token {
+                    kind: TokenKind::RParen,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            ';' => {
+                self.source_pos.row();
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Ok(Token {
+                    kind: TokenKind::Semicolon,
+                    lexeme,
+                    span: SourceSpan {
+                        start,
+                        end: self.source_pos,
+                    },
+                }))
+            }
+            u => {
+                self.source_pos.advance_by_char(u);
+                let lexeme = &source[start.byte_offset..self.source_pos.byte_offset];
+                Some(Err(SyntacticError {
+                    kind: SyntacticErrorKind::UnexpectedChar(u),
                     span: SourceSpan {
                         start,
                         end: self.source_pos,
