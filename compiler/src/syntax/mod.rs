@@ -3,6 +3,7 @@ pub mod token;
 pub mod error;
 
 pub struct SourceFile<'a> {
+    pub id: usize,
     pub name: &'a str,
     pub source: &'a [u8],
     pub package: Option<&'a str>
@@ -16,7 +17,42 @@ pub struct SourcePos {
     pub byte_offset: usize
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceSpan {
     pub start: SourcePos,
     pub end: SourcePos
+}
+
+impl SourcePos {
+    pub fn start_of_file(file_index: usize) -> Self {
+        Self {
+            file_index,
+            line: 1,
+            column: 1,
+            byte_offset: 0
+        }
+    }
+    
+    pub fn newline(&mut self) {
+        self.line += 1;
+        self.byte_offset += 1;
+        self.column = 1;
+    }
+    
+    pub fn row(&mut self) {
+        self.column += 1;
+        self.byte_offset += 1;
+    }
+}
+
+impl PartialOrd for SourcePos {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.byte_offset.cmp(&other.byte_offset))
+    }
+}
+
+impl Ord for SourcePos {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.byte_offset.cmp(&other.byte_offset)
+    }
 }

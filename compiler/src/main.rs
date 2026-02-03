@@ -3,6 +3,8 @@
 
 use raph_api::{io::fs::MappedFile, println};
 
+use crate::syntax::{SourceFile, lexer::Lexer};
+
 extern crate raph_common;
 extern crate raph_runtime;
 
@@ -14,10 +16,19 @@ pub extern "C" fn _start() -> i32 {
 
     if let Some(file) = MappedFile::open("test_program") {
         println!("Read {} bytes from file:", file.len());
-        if let Some(text) = file.as_str() {
-            println!("Source: {}", text);
-        } else {
-            println!("<invalid utf-8>");
+        let source_file = SourceFile {
+            id: 0,
+            name: "test_program",
+            source: file.as_bytes(),
+            package: None,
+        };
+        let lexer = Lexer::new(&source_file);
+        println!("Tokens:");
+        for result in lexer {
+            match result {
+                Ok(token) => println!("{:?}", token),
+                Err(err) => println!("Error: {:?}", err),
+            }
         }
         return 0;
     } else {

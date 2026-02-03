@@ -1,17 +1,33 @@
 use crate::syntax::SourceSpan;
 
-pub struct Token {
-    pub lexeme: &'static str,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Token<'a> {
+    pub lexeme: &'a [u8],
     pub kind: TokenKind,
-    pub span: SourceSpan
+    pub span: SourceSpan,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Number,
-    String
+    String,
+    EndOfFile,
 }
 
-pub struct TokenStream {
-    pub tokens: &'static [Token],
-    pub position: usize    
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LexError<'a> {
+    pub kind: LexErrorKind,
+    pub span: SourceSpan,
+    pub lexeme: &'a [u8],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LexErrorKind {
+    UnexpectedChar(char),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenStream<'a> {
+    pub tokens: &'a [Token<'a>],
+    pub position: usize,
 }
