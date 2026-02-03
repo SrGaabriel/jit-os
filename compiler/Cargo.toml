@@ -1,0 +1,10 @@
+[package]
+name = "compiler"
+version = "0.1.0"
+publish.workspace = true
+edition.workspace = true
+
+[dependencies]
+raph_common.workspace = true
+raph_api.workspace = true
+raph_runtime.workspace = true
