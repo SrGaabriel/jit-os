@@ -3,6 +3,6 @@
 use core::panic::PanicInfo;
 
 #[panic_handler]
-pub fn panic(info: &PanicInfo) -> ! {
-    raph_api::abort(info);
+fn panic(info: &PanicInfo) -> ! {
+    raph_api::abort(info)
 }
