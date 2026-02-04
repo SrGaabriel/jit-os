@@ -8,6 +8,7 @@ use crate::syntax::{SourceFile, lexer::Lexer};
 extern crate raph_common;
 extern crate raph_runtime;
 
+pub mod core;
 pub mod syntax;
 
 #[unsafe(no_mangle)]

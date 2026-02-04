@@ -91,6 +91,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }))
             }
             c if is_ident_start(c) => {
+                let is_upper = c.is_uppercase();
                 while self.cursor.byte_offset < source.len() {
                     let remaining = &source[self.cursor.byte_offset..];
                     if let Some(c) = decode_utf8_char(remaining) {
@@ -106,7 +107,8 @@ impl<'a> Iterator for Lexer<'a> {
                 let lexeme = &source[start..self.cursor.byte_offset];
                 let kind = match lexeme {
                     b"struct" => TokenKind::Struct,
-                    _ => TokenKind::Identifier,
+                    _ if is_upper => TokenKind::UpperIdentifier,
+                    _ => TokenKind::LowerIdentifier,
                 };
 
                 Some(Ok(Token {
@@ -194,6 +196,76 @@ impl<'a> Iterator for Lexer<'a> {
                 self.cursor.advance(1);
                 Some(Ok(Token {
                     kind: TokenKind::Semicolon,
+                    lexeme: &source[start..self.cursor.byte_offset],
+                    span: self.cursor.span_from(start),
+                }))
+            }
+            '[' => {
+                self.cursor.advance(1);
+                Some(Ok(Token {
+                    kind: TokenKind::LBracket,
+                    lexeme: &source[start..self.cursor.byte_offset],
+                    span: self.cursor.span_from(start),
+                }))
+            }
+            ']' => {
+                self.cursor.advance(1);
+                Some(Ok(Token {
+                    kind: TokenKind::RBracket,
+                    lexeme: &source[start..self.cursor.byte_offset],
+                    span: self.cursor.span_from(start),
+                }))
+            }
+            '-' => {
+                self.cursor.advance(1);
+                if self.cursor.byte_offset < source.len() && source[self.cursor.byte_offset] == b'>'
+                {
+                    self.cursor.advance(1);
+                    Some(Ok(Token {
+                        kind: TokenKind::Arrow,
+                        lexeme: &source[start..self.cursor.byte_offset],
+                        span: self.cursor.span_from(start),
+                    }))
+                } else {
+                    let lexeme = &source[start..self.cursor.byte_offset];
+                    Some(Err(LexError {
+                        kind: LexErrorKind::UnexpectedChar('-'),
+                        span: self.cursor.span_from(start),
+                        lexeme,
+                    }))
+                }
+            }
+            '→' => {
+                self.cursor.advance_char('→');
+                Some(Ok(Token {
+                    kind: TokenKind::Arrow,
+                    lexeme: &source[start..self.cursor.byte_offset],
+                    span: self.cursor.span_from(start),
+                }))
+            }
+            '>' => {
+                self.cursor.advance(1);
+                if self.cursor.byte_offset < source.len() && source[self.cursor.byte_offset] == b'<'
+                {
+                    self.cursor.advance(1);
+                    Some(Ok(Token {
+                        kind: TokenKind::Product,
+                        lexeme: &source[start..self.cursor.byte_offset],
+                        span: self.cursor.span_from(start),
+                    }))
+                } else {
+                    let lexeme = &source[start..self.cursor.byte_offset];
+                    Some(Err(LexError {
+                        kind: LexErrorKind::UnexpectedChar('>'),
+                        span: self.cursor.span_from(start),
+                        lexeme,
+                    }))
+                }
+            }
+            '×' => {
+                self.cursor.advance_char('×');
+                Some(Ok(Token {
+                    kind: TokenKind::Product,
                     lexeme: &source[start..self.cursor.byte_offset],
                     span: self.cursor.span_from(start),
                 }))

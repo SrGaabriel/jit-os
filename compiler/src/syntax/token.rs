@@ -9,7 +9,8 @@ pub struct Token<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
-    Identifier,
+    LowerIdentifier,
+    UpperIdentifier,
     Number,
     String,
     Equal,
@@ -20,7 +21,11 @@ pub enum TokenKind {
     RBrace,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     Semicolon,
+    Arrow,
+    Product,
     EndOfFile,
 }
 
