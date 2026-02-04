@@ -107,6 +107,8 @@ impl<'a> Iterator for Lexer<'a> {
                 let lexeme = &source[start..self.cursor.byte_offset];
                 let kind = match lexeme {
                     b"struct" => TokenKind::Struct,
+                    b"def" => TokenKind::Def,
+                    b"let" => TokenKind::Let,
                     _ if is_upper => TokenKind::UpperIdentifier,
                     _ => TokenKind::LowerIdentifier,
                 };

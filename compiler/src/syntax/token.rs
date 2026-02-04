@@ -27,6 +27,8 @@ pub enum TokenKind {
     Arrow,
     Product,
     EndOfFile,
+    Def,
+    Let,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

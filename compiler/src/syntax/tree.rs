@@ -4,12 +4,14 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::string::String;
 
-pub trait Phase {
-    type ExprAnn;
-    type TyAnn;
+pub trait Phase : core::fmt::Debug + Clone + PartialEq + Eq {
+    type ExprAnn : core::fmt::Debug + Clone + PartialEq + Eq;
+    type TyAnn : core::fmt::Debug + Clone + PartialEq + Eq;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parsed;
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Typed;
 
 impl Phase for Parsed {
@@ -22,12 +24,20 @@ impl Phase for Typed {
     type TyAnn = ();
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expr<P: Phase> {
     pub ann: P::ExprAnn,
     pub kind: ExprKind<P>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind<P: Phase> {
+    Root(Vec<Expr<P>>),
+    Def {
+        name: String,
+        binders: Vec<Binder>,
+        return_type: TypeExpr
+    },
     Var(String),
     App(Box<Expr<P>>, Box<Expr<P>>),
 }

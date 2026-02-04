@@ -134,6 +134,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Arrow => write!(f, "`->`"),
             TokenKind::Product => write!(f, "`><`"),
             TokenKind::EndOfFile => write!(f, "end of file"),
+            TokenKind::Def => write!(f, "`def`"),
+            TokenKind::Let => write!(f, "`let`"),
         }
     }
 }
