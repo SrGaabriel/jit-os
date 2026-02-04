@@ -14,7 +14,7 @@ extern crate alloc;
 extern crate common;
 extern crate runtime;
 
-pub mod core;
+pub mod elaboration;
 pub mod syntax;
 
 #[derive(Debug)]

@@ -1,0 +1,1 @@
+def a {a : Type} (n : Nat) (e : 5) : Vec N a = 5 a.hey
