@@ -14,6 +14,7 @@ extern crate alloc;
 extern crate common;
 extern crate runtime;
 
+pub mod module;
 pub mod elaboration;
 pub mod syntax;
 
