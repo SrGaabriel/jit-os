@@ -17,15 +17,12 @@ use crate::{
     elaboration::{
         ctx::{LocalContext, MetavarContext},
         err::ElabError,
-    },
-    module::{
+    }, log::pretty::pretty_term, module::{
         ModuleId,
         name::QualifiedName,
         prim::{prim_array, prim_array_cons, prim_array_nil, prim_fin, prim_nat, prim_string},
         unique::{Unique, UniqueGen},
-    },
-    spine::{BinderInfo, Level, Literal, Term},
-    syntax::tree::{SyntaxBinder, SyntaxExpr},
+    }, spine::{BinderInfo, Level, Literal, Term}, syntax::tree::{SyntaxBinder, SyntaxExpr}
 };
 
 #[derive(Debug, Clone)]
@@ -176,6 +173,10 @@ impl ElabState {
                 return_type,
                 body,
             } => self.elaborate_def(name, binders, return_type, body),
+            SyntaxExpr::Eval(expr) => {
+                let term = self.elaborate_term(expr, None);
+                println!("Evaluated term: {:#?}", pretty_term(&term));
+            }
             _ => (),
         }
     }
@@ -324,14 +325,22 @@ impl ElabState {
                     );
                     current_length += 1;
                 }
-                println!("Elaborated array term: {:#?}", result);
-                println!("Elaborated array type: {:#?}", array_type);
-
                 (result, array_type)
             }
             SyntaxExpr::App(fun, arg) => {
-                let (term, fn_type) = self.elaborate_term_inner(fun);
-                let fn_type = reduce::whnf(self, &fn_type);
+                let (mut term, mut fn_type) = self.elaborate_term_inner(fun);
+                
+                loop {
+                    fn_type = reduce::whnf(self, &fn_type);
+                    match &fn_type {
+                        Term::Pi(info, param_ty, body_ty) if info != &BinderInfo::Explicit => {
+                            let mvar = self.fresh_mvar(*param_ty.clone());
+                            fn_type = subst::instantiate(body_ty, &mvar);
+                            term = Term::App(Box::new(term), Box::new(mvar));
+                        },
+                        _ => break,
+                    };
+                };
 
                 match fn_type {
                     Term::Pi(_info, param_ty, body_ty) => {

@@ -1,3 +1,5 @@
+pub mod pretty;
+
 use alloc::string::String;
 use miette::{Diagnostic, NamedSource};
 

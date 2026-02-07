@@ -1,0 +1,7 @@
+def type_implicit {a : Type} (arr : Array a) : Type = a
+
+def type_explicit (a : Type) (arr : Array a) : Type = a
+
+eval type_implicit [5,4,3,2,1];
+
+eval type_explicit Nat [5,4,3,2,1];

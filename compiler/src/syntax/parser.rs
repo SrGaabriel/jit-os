@@ -68,7 +68,10 @@ pub fn parse<'a>(
 fn program<'a>() -> impl Parser<'a, ParserInput<'a>, Expr, ParserExtra<'a>> {
     let mut expr = Recursive::declare();
 
-    let def = def_parser(expr.clone());
+    let def = choice((
+        def_parser(expr.clone()),
+        eval_parser(expr.clone()),
+    ));
 
     expr.define(expr_impl(expr.clone()));
 
@@ -96,6 +99,15 @@ fn def_parser<'a>(
             return_type: Box::new(ret_type),
             body: Box::new(body),
         })
+}
+
+fn eval_parser<'a>(
+    expr: impl Parser<'a, ParserInput<'a>, Expr, ParserExtra<'a>> + Clone,
+) -> impl Parser<'a, ParserInput<'a>, Expr, ParserExtra<'a>> {
+    just_token(TokenKind::Eval)
+        .ignore_then(expr)
+        .then_ignore(just_token(TokenKind::Semicolon))
+        .map(|e| Expr::Eval(Box::new(e)))
 }
 
 fn binder<'a>(

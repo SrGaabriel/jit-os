@@ -137,6 +137,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Def => write!(f, "`def`"),
             TokenKind::Let => write!(f, "`let`"),
             TokenKind::In => write!(f, "`in`"),
+            TokenKind::Eval => write!(f, "`eval`"),
             TokenKind::Lambda => write!(f, "`\\` or `λ`"),
             TokenKind::FatArrow => write!(f, "`=>`"),
             TokenKind::Dot => write!(f, "`.`"),

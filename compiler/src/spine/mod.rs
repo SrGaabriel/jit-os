@@ -18,10 +18,11 @@ pub enum Term {
 }
 
 impl Term {
-    fn boxed(self) -> Box<Self> {
+    pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
-    fn mk_app(l: Term, r: Term) -> Self {
+
+    pub fn mk_app(l: Term, r: Term) -> Self {
         Self::App(l.boxed(), r.boxed())
     }
 }

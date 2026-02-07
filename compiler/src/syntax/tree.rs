@@ -35,6 +35,7 @@ pub enum SyntaxExpr {
     Array(Vec<SyntaxExpr>),
     Pi(SyntaxBinder, Box<SyntaxExpr>),
     Sigma(SyntaxBinder, Box<SyntaxExpr>),
+    Eval(Box<SyntaxExpr>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

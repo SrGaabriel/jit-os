@@ -15,6 +15,7 @@ pub enum TokenKind {
     String,
     Equal,
     Struct,
+    Eval,
     Comma,
     Colon,
     LBrace,
