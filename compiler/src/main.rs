@@ -1,14 +1,14 @@
 #![no_std]
 #![no_main]
 
-use alloc::string::String;
-use miette::{Diagnostic, NamedSource, NarratableReportHandler};
+use alloc::string::{String, ToString};
 use api::{
     io::{fs::MappedFile, stdin::Args},
     println,
 };
+use miette::{NamedSource, NarratableReportHandler};
 
-use crate::syntax::{SourceFile, lexer::Lexer, parser::parse};
+use crate::{log::ErrorWithSource, syntax::{SourceFile, lexer::Lexer, parser::parse}};
 
 extern crate alloc;
 extern crate common;
@@ -18,42 +18,7 @@ pub mod module;
 pub mod elaboration;
 pub mod syntax;
 pub mod spine;
-
-#[derive(Debug)]
-struct ErrorWithSource<'a, E: Diagnostic + ::core::fmt::Debug> {
-    error: &'a E,
-    source: &'a NamedSource<String>,
-}
-
-impl<E: Diagnostic + ::core::fmt::Debug> ::core::fmt::Display for ErrorWithSource<'_, E> {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "{}", self.error)
-    }
-}
-
-impl<E: Diagnostic + ::core::fmt::Debug> miette::StdError for ErrorWithSource<'_, E> {}
-
-impl<E: Diagnostic + ::core::fmt::Debug> Diagnostic for ErrorWithSource<'_, E> {
-    fn code<'a>(&'a self) -> Option<alloc::boxed::Box<dyn ::core::fmt::Display + 'a>> {
-        self.error.code()
-    }
-
-    fn severity(&self) -> Option<miette::Severity> {
-        self.error.severity()
-    }
-
-    fn help<'a>(&'a self) -> Option<alloc::boxed::Box<dyn ::core::fmt::Display + 'a>> {
-        self.error.help()
-    }
-
-    fn labels(&self) -> Option<alloc::boxed::Box<dyn Iterator<Item = miette::LabeledSpan> + '_>> {
-        self.error.labels()
-    }
-
-    fn source_code(&self) -> Option<&dyn miette::SourceCode> {
-        Some(self.source)
-    }
-}
+pub mod log;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> i32 {
@@ -121,11 +86,19 @@ pub extern "C" fn _start() -> i32 {
         }
 
         match ast {
-            Some(tree) => println!("Parsed: {:?}", tree),
+            Some(tree) => {
+                println!("AST produced for module {}: {:#?}", source_file.name, tree);
+                let module_id = source_file.name.to_string();
+                let elaboration_result = elaboration::elaborate_file(
+                    module_id,
+                    &tree
+                );
+                println!("Elaborated module: {:#?}", elaboration_result);
+            },
             None if errors.is_empty() && lex_errors.is_empty() => println!("No AST produced"),
             None => {}
         }
-
+        
         return 0;
     } else {
         println!("File not found!");

@@ -46,6 +46,7 @@ fn structural_eq(a: &Term, b: &Term) -> bool {
         (Term::Lit(l1), Term::Lit(l2)) => l1 == l2,
         (Term::Sort(l1), Term::Sort(l2)) => structural_eq_level(l1, l2),
         (Term::App(f1, a1), Term::App(f2, a2)) => structural_eq(f1, f2) && structural_eq(a1, a2),
+        (Term::Const(n1), Term::Const(n2)) => n1 == n2,
         (Term::Lam(_, ty1, b1), Term::Lam(_, ty2, b2)) => {
             structural_eq(ty1, ty2) && structural_eq(b1, b2)
         }
@@ -86,7 +87,7 @@ fn instantiate_mvars(state: &ElabState, term: &Term) -> Term {
                 term.clone()
             }
         }
-        Term::BVar(_) | Term::FVar(_) | Term::Lit(_) => term.clone(),
+        Term::Const(_) | Term::BVar(_) | Term::FVar(_) | Term::Lit(_) => term.clone(),
         Term::Sort(l) => Term::Sort(instantiate_mvars_level(state, l)),
         Term::App(f, a) => Term::App(
             Box::new(instantiate_mvars(state, f)),
@@ -158,6 +159,7 @@ fn occurs_in(mvar: Unique, term: &Term) -> bool {
         Term::BVar(_) => false,
         Term::FVar(_) => false,
         Term::Lit(_) => false,
+        Term::Const(_) => false,
         Term::Sort(l) => occurs_in_level(mvar, l),
         Term::App(f, a) => occurs_in(mvar.clone(), f) || occurs_in(mvar, a),
         Term::Lam(_, ty, body) => occurs_in(mvar.clone(), ty) || occurs_in(mvar, body),

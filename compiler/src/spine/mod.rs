@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, string::String};
 
-use crate::{module::unique::Unique};
+use crate::module::{name::QualifiedName, unique::Unique};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
@@ -9,6 +9,7 @@ pub enum Term {
     MVar(Unique),
     App(Box<Term>, Box<Term>),
     Sort(Level),
+    Const(QualifiedName),
     Lam(BinderInfo, Box<Term>, Box<Term>),
     Pi(BinderInfo, Box<Term>, Box<Term>),
     Sigma(BinderInfo, Box<Term>, Box<Term>),

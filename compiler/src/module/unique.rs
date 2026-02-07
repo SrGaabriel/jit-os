@@ -10,7 +10,7 @@ pub struct Unique {
 }
 
 impl Unique {
-    pub fn new(id: usize, module_id: ModuleId, display_name: Option<String>) -> Self {
+    pub const fn new(id: usize, module_id: ModuleId, display_name: Option<String>) -> Self {
         Self {
             id,
             module_id,

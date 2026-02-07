@@ -4,7 +4,7 @@ pub mod reduce;
 pub mod subst;
 pub mod unify;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, string::{String, ToString}, vec::Vec};
 
 use crate::{
     elaboration::{
@@ -12,24 +12,78 @@ use crate::{
         err::ElabError,
     },
     module::{
-        ModuleId,
-        unique::{Unique, UniqueGen},
+        ModuleId, name::QualifiedName, prim::{prim_fin, prim_nat, prim_string, prim_type}, unique::{Unique, UniqueGen}
     },
-    spine::{BinderInfo, Term},
+    spine::{BinderInfo, Level, Term},
     syntax::tree::{SyntaxBinder, SyntaxExpr},
 };
 
+#[derive(Debug, Clone)]
 pub struct Environment {
     pub module_id: ModuleId,
-    pub decls: Vec<Declaration>,
+    pub decls: BTreeMap<QualifiedName, Declaration>,
 }
 
+impl Environment {
+    // todo: remove
+    pub fn pre_loaded(module_id: ModuleId) -> Self {
+        let mut decls = BTreeMap::new();
+        decls.insert(prim_nat(), Declaration::Constructor {
+            name: prim_nat(),
+            type_: Term::Sort(Level::Zero),
+        });
+        decls.insert(prim_string(), Declaration::Constructor {
+            name: prim_string(),
+            type_: Term::Sort(Level::Zero),
+        });
+        decls.insert(prim_type(), Declaration::Constructor {
+            name: prim_type(),
+            type_: Term::Sort(Level::Succ(Box::new(Level::Zero))),
+        });
+        decls.insert(prim_fin(), Declaration::Constructor {
+            name: prim_fin(),
+            type_: Term::Pi(BinderInfo::Explicit, Box::new(Term::Sort(Level::Zero)), Box::new(Term::Sort(Level::Zero))),
+        });
+        Self {
+            module_id,
+            decls,
+        }
+    }
+    
+    pub fn lookup(&self, name: &QualifiedName) -> Option<&Declaration> {
+        self.decls.get(name)
+    }
+    
+    pub fn lookup_string(&self, name: &str) -> Option<&Declaration> {
+        self.decls.values().find(|decl| match decl {
+            Declaration::Definition { name: decl_name, .. } => 
+                decl_name.unique.display_name == Some(name.to_string()),
+            Declaration::Constructor { name: decl_name, .. } =>
+                decl_name.unique.display_name == Some(name.to_string()),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Declaration {
     Definition {
-        name: String, // todo: qualified name
+        name: QualifiedName,
         type_: Term,
         value: Term,
     },
+    Constructor {
+        name: QualifiedName,
+        type_: Term,
+    },
+}
+
+impl Declaration {
+    pub fn name(&self) -> &QualifiedName {
+        match self {
+            Declaration::Definition { name, .. } => name,
+            Declaration::Constructor { name, .. } => name,
+        }
+    }
 }
 
 pub struct ElabState {
@@ -45,13 +99,19 @@ impl ElabState {
         Self {
             env: Environment {
                 module_id: module.clone(),
-                decls: Vec::new(),
+                decls: BTreeMap::new(),
             },
             gen_: UniqueGen::new(module),
             mctx: MetavarContext::new(),
             lctx: LocalContext { decls: Vec::new() },
             errors: Vec::new(),
         }
+    }
+    
+    pub fn pre_loaded(module: ModuleId) -> Self {
+        let mut state = Self::new(module);
+        state.env = Environment::pre_loaded(state.env.module_id.clone());
+        state
     }
 
     pub fn fresh_mvar(&mut self, type_: Term) -> Term {
@@ -76,7 +136,7 @@ impl ElabState {
                 return_type,
                 body,
             } => self.elaborate_def(name, binders, return_type, body),
-            _ => todo!()
+            _ => ()
         }
     }
 
@@ -87,6 +147,8 @@ impl ElabState {
         return_type: &SyntaxExpr,
         body: &SyntaxExpr,
     ) {
+        let def_name = QualifiedName::new(self.gen_.fresh(name.to_string()));
+
         let saved_lctx = self.lctx.clone();
         let mut binder_fvars: Vec<(Unique, BinderInfo, Term)> = Vec::new();
 
@@ -96,7 +158,25 @@ impl ElabState {
                 SyntaxBinder::Implicit(n, ty) => (n, ty, BinderInfo::Implicit),
                 SyntaxBinder::Instance(n, ty) => (n, ty, BinderInfo::InstanceImplicit),
             };
+            let elaborated_type = self.elaborate_term(binder_type_syntax, None);
+            let (fvar, _) = self.fresh_fvar(binder_name.clone(), elaborated_type.clone());
+            binder_fvars.push((fvar, info, elaborated_type));
         }
+        let elaborated_return_type = self.elaborate_term(return_type, None);
+        let elaborated_body = self.elaborate_term(body, Some(&elaborated_return_type));
+
+        let mut pi_type = elaborated_return_type;
+        for (_, info, ty) in binder_fvars.into_iter().rev() {
+            pi_type = Term::Pi(info, Box::new(ty), Box::new(pi_type));
+        }
+
+        self.env.decls.insert(def_name.clone(), Declaration::Definition {
+            name: def_name,
+            type_: pi_type,
+            value: elaborated_body,
+        });
+
+        self.lctx = saved_lctx;
     }
 
     fn elaborate_term(&mut self, syntax: &SyntaxExpr, expected_type: Option<&Term>) -> Term {
@@ -120,11 +200,58 @@ impl ElabState {
                 if let Some(decl) = self.lctx.lookup_name(name) {
                     return (Term::FVar(decl.fvar.clone()), decl.type_.clone());
                 }
+                
+                if let Some(decl) = self.env.lookup_string(name) {
+                    match decl {
+                        Declaration::Definition { type_, .. } => {
+                            return (Term::Const(decl.name().clone()), type_.clone());
+                        }
+                        _ => panic!("unexpected non-definition declaration for variable {}", name),
+                    }
+                }
 
                 self.errors.push(ElabError::UndefinedVariable(name.clone()));
                 (self.erroneous_term(), self.erroneous_term())
+            },
+            SyntaxExpr::Constructor(name) => {
+                if let Some(decl) = self.env.lookup_string(name) {
+                    match decl {
+                        Declaration::Constructor { type_, .. } => {
+                            return (Term::Const(decl.name().clone()), type_.clone());
+                        },
+                        _ => panic!("unexpected non-constructor declaration for constructor {}", name),
+                    }
+                }
+                
+                self.errors.push(ElabError::UndefinedConstructor(name.clone()));
+                (self.erroneous_term(), self.erroneous_term())
             }
-            _ => todo!(),
+            SyntaxExpr::Lit(lit) => {
+                let ty = match lit {
+                    crate::spine::Literal::Nat(_) => Term::Const(prim_nat()),
+                    crate::spine::Literal::Str(_) => Term::Const(prim_string()),
+                };
+                (Term::Lit(lit.clone()), ty)
+            },
+            SyntaxExpr::App(fun, arg) => {
+                let (term, fn_type) = self.elaborate_term_inner(fun);
+                let fn_type = reduce::whnf(self, &fn_type);
+                
+                match fn_type {
+                    Term::Pi(_info, param_ty, body_ty) => {
+                        let elaborated_arg = self.elaborate_term(arg, Some(&param_ty));
+                        (Term::App(Box::new(term), Box::new(elaborated_arg)), *body_ty)
+                    },
+                    u => {
+                        self.errors.push(ElabError::NotAFunction(u));
+                        return (self.erroneous_term(), self.erroneous_term())
+                    }
+                }
+            }
+            u => {
+                self.errors.push(ElabError::UnsupportedSyntax(u.clone()));
+                (self.erroneous_term(), self.erroneous_term())
+            }
         }
     }
 
@@ -137,7 +264,7 @@ pub fn elaborate_file(
     module_id: ModuleId,
     root: &SyntaxExpr,
 ) -> Result<Environment, Vec<ElabError>> {
-    let mut state = ElabState::new(module_id);
+    let mut state = ElabState::pre_loaded(module_id);
 
     match root {
         SyntaxExpr::Root(commands) => {
