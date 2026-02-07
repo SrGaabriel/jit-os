@@ -246,8 +246,13 @@ fn expr_atom<'a>(
                 Expr::Tuple(items)
             }
         });
+    
+    let array = just_token(TokenKind::LBracket)
+        .ignore_then(expr.clone().separated_by(just_token(TokenKind::Comma)).collect())
+        .then_ignore(just_token(TokenKind::RBracket))
+        .map(Expr::Array);
 
-    choice((var, constructor, number, string, hole, tuple_or_grouped))
+    choice((var, constructor, number, string, hole, tuple_or_grouped, array))
 }
 
 fn rich_to_parse_error(err: Rich<'_, Token<'_>, Span>) -> ParseError {

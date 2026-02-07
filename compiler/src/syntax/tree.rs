@@ -32,7 +32,7 @@ pub enum SyntaxExpr {
     Proj(Box<SyntaxExpr>, String),
     Hole,
     Arrow(Box<SyntaxExpr>, Box<SyntaxExpr>),
-    List(Box<SyntaxExpr>),
+    Array(Vec<SyntaxExpr>),
     Pi(SyntaxBinder, Box<SyntaxExpr>),
     Sigma(SyntaxBinder, Box<SyntaxExpr>),
 }

@@ -22,7 +22,7 @@ pub fn prim_string() -> QualifiedName {
 
 pub fn prim_fin() -> QualifiedName {
     QualifiedName::new(Unique::new(
-        3,
+        2,
         PRIM_MODULE_ID.to_string(),
         Some("Fin".to_string()),
     ))
@@ -30,8 +30,24 @@ pub fn prim_fin() -> QualifiedName {
 
 pub fn prim_array() -> QualifiedName {
     QualifiedName::new(Unique::new(
-        4,
+        3,
         PRIM_MODULE_ID.to_string(),
         Some("Array".to_string()),
+    ))
+}
+
+pub fn prim_array_nil() -> QualifiedName {
+    QualifiedName::new(Unique::new(
+        4,
+        PRIM_MODULE_ID.to_string(),
+        Some("Array.Nil".to_string()),
+    ))
+}
+
+pub fn prim_array_cons() -> QualifiedName {
+    QualifiedName::new(Unique::new(
+        5,
+        PRIM_MODULE_ID.to_string(),
+        Some("Array.Cons".to_string()),
     ))
 }

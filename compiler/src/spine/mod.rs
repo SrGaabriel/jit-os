@@ -17,6 +17,15 @@ pub enum Term {
     Lit(Literal),
 }
 
+impl Term {
+    fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+    fn mk_app(l: Term, r: Term) -> Self {
+        Self::App(l.boxed(), r.boxed())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinderInfo {
     Explicit,
@@ -28,7 +37,7 @@ pub enum BinderInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
     Nat(u64),
-    Str(String),    
+    Str(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

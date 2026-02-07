@@ -11,6 +11,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use api::println;
 
 use crate::{
     elaboration::{
@@ -20,10 +21,10 @@ use crate::{
     module::{
         ModuleId,
         name::QualifiedName,
-        prim::{prim_array, prim_fin, prim_nat, prim_string},
+        prim::{prim_array, prim_array_cons, prim_array_nil, prim_fin, prim_nat, prim_string},
         unique::{Unique, UniqueGen},
     },
-    spine::{BinderInfo, Level, Term},
+    spine::{BinderInfo, Level, Literal, Term},
     syntax::tree::{SyntaxBinder, SyntaxExpr},
 };
 
@@ -258,8 +259,10 @@ impl ElabState {
                 self.errors.push(ElabError::UndefinedVariable(name.clone()));
                 (self.erroneous_term(), self.erroneous_term())
             }
-            SyntaxExpr::Constructor(name) if name == "Type" =>
-                (Term::Sort(Level::Zero), Term::Sort(Level::Succ(Box::new(Level::Zero)))),
+            SyntaxExpr::Constructor(name) if name == "Type" => (
+                Term::Sort(Level::Zero),
+                Term::Sort(Level::Succ(Box::new(Level::Zero))),
+            ),
             SyntaxExpr::Constructor(name) => {
                 if let Some(decl) = self.env.lookup_string(name) {
                     match decl {
@@ -284,6 +287,48 @@ impl ElabState {
                 };
                 (Term::Lit(lit.clone()), ty)
             }
+            SyntaxExpr::Array(elems) => {
+                let elem_type = if let Some(head) = elems.first() {
+                    let (_term, head_ty) = self.elaborate_term_inner(head);
+                    head_ty
+                } else {
+                    self.fresh_mvar(Term::Sort(Level::Zero))
+                };
+                let elems_len = elems.len() as u64;
+
+                let array_type = Term::App(
+                    Box::new(Term::App(
+                        Box::new(Term::Const(prim_array())),
+                        Box::new(elem_type.clone()),
+                    )),
+                    Box::new(Term::Lit(Literal::Nat(elems_len))),
+                );
+                let mut result = Term::Const(prim_array_nil());
+                let mut current_length = 0;
+                let mut elems = elems.clone();
+                elems.reverse();
+                for elem in elems {
+                    let elaborated_elem = self.elaborate_term(&elem, Some(&elem_type));
+                    result = Term::App(
+                        Box::new(Term::App(
+                            Box::new(Term::App(
+                                Box::new(Term::App(
+                                    Box::new(Term::Const(prim_array_cons())),
+                                    Box::new(elem_type.clone()),
+                                )),
+                                Box::new(Term::Lit(Literal::Nat(current_length))),
+                            )),
+                            Box::new(elaborated_elem),
+                        )),
+                        Box::new(result),
+                    );
+                    current_length += 1;
+                }
+                println!("Elaborated array term: {:#?}", result);
+                println!("Elaborated array type: {:#?}", array_type);
+
+                (result, array_type)
+            }
             SyntaxExpr::App(fun, arg) => {
                 let (term, fn_type) = self.elaborate_term_inner(fun);
                 let fn_type = reduce::whnf(self, &fn_type);
@@ -294,7 +339,7 @@ impl ElabState {
                         let return_type = subst::instantiate(&body_ty, &elaborated_arg);
                         (
                             Term::App(Box::new(term), Box::new(elaborated_arg)),
-                            return_type
+                            return_type,
                         )
                     }
                     u => {
