@@ -1,13 +1,14 @@
 #![no_std]
 #![no_main]
 
+use alloc::string::{String, ToString};
+
 use crate::{
     idt::{enable_interrupts, init_idt},
     pic::init_pic,
     serial::init_serial,
     tty::{
-        Tty,
-        writer::TextWriter,
+        Tty, color::{Color, ColorCode}, writer::TextWriter
     },
 };
 
@@ -142,11 +143,17 @@ pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
         fb_buffer,
         info.framebuffer.clone(),
     );
-    let mut tty = Tty::new(text_writer, None);
+    let mut tty = Tty::new(
+        text_writer,
+        ColorCode::new(Color::White, Color::Black),
+    );
+    tty.set_shell_prompt("> ".to_string(), ColorCode::new(Color::Green, Color::Black));
     loop {
         if let Some(scancode) = pic::pop_scancode() {
-            println!("Scancode: {:#x}", scancode);
-            tty.handle_input(scancode);
+            if let Some(command) = tty.handle_input(scancode) {
+                let command = String::from_utf8_lossy(&command);
+                println!("Command entered: {}", command);
+            }
         }
     }
 }
