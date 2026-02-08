@@ -3,5 +3,3 @@ name = "common"
 version = "0.1.0"
 publish.workspace = true
 edition.workspace = true
-
-[dependencies]

@@ -8,3 +8,5 @@ edition.workspace = true
 common.workspace = true
 api.workspace = true
 runtime.workspace = true
+talc.workspace = true
+spin.workspace = true

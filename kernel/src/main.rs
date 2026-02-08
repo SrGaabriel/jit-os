@@ -7,6 +7,8 @@ extern crate alloc;
 extern crate common;
 extern crate runtime;
 
+pub mod heap;
+
 #[repr(C)]
 pub struct MemoryMapInfo {
     pub entries: *const u8,
@@ -109,8 +111,11 @@ pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
         init_gdt();
         init_idt();
     };
-
+    
     let info = unsafe { &*boot_info };
+    let (free_region, free_size) = find_free_region(&info.memory_map);
+    heap::init_heap(free_region, free_size);
+    
     let fb = info.framebuffer.base as *mut u32;
     let pixels = (info.framebuffer.stride * info.framebuffer.height) as usize;
     for i in 0..pixels {
@@ -167,3 +172,30 @@ struct IdtDescriptor {
 }
 
 static mut IDT: [IdtEntry; 256] = [IdtEntry::missing(); 256];
+
+#[repr(C)]
+struct MemoryDescriptor {
+    type_: u32,
+    physical_start: u64,
+    virtual_start: u64,
+    number_of_pages: u64,
+    attribute: u64,
+}
+
+fn find_free_region(memory_map: &MemoryMapInfo) -> (*mut u8, usize) {
+    let mut largest_region = core::ptr::null_mut();
+    let mut largest_size = 0;
+    for i in 0..memory_map.entry_count {
+        let entry_addr = memory_map.entries as usize + i * memory_map.entry_size;
+        let desc = unsafe { &*(entry_addr as *const MemoryDescriptor) };
+        if desc.type_ == 7 {
+            let region_start = desc.physical_start as *mut u8;
+            let region_size = (desc.number_of_pages * 4096) as usize;
+            if region_size > largest_size {
+                largest_size = region_size;
+                largest_region = region_start;
+            }
+        }
+    }
+    (largest_region, largest_size)
+}
