@@ -1,6 +1,9 @@
-use core::fmt::Write;
+use alloc::vec::Vec;
 
-use crate::{tty::keyboard::{Key, KeyEvent}};
+use crate::{
+    println,
+    tty::{color::{Color, ColorCode}, keyboard::{Key, KeyEvent, KeyboardState}},
+};
 
 pub mod color;
 mod font;
@@ -10,10 +13,11 @@ pub mod writer;
 pub struct Tty {
     pub writer: writer::TextWriter,
     pub command_handler: Option<fn(&str)>,
-    control_key_pressed: bool,
-    shift_key_pressed: bool,
-    alt_key_pressed: bool,
+    keyboard_state: KeyboardState,
     caps_lock_active: bool,
+    cursor: (usize, usize),
+    current_prompt: Vec<u8>,
+    color_code: ColorCode
 }
 
 impl Tty {
@@ -21,33 +25,27 @@ impl Tty {
         Self {
             writer,
             command_handler,
-            control_key_pressed: false,
-            shift_key_pressed: false,
-            alt_key_pressed: false,
+            keyboard_state: KeyboardState::new(),
             caps_lock_active: false,
+            cursor: (0, 0),
+            current_prompt: alloc::vec![],
+            color_code: ColorCode::new(Color::White, Color::Black),
         }
     }
 
     pub fn handle_input(&mut self, input: u8) {
         let key_event = KeyEvent::from_scancode(input);
+        self.keyboard_state.update(input);
+        println!("Key event: {:?}", key_event);
         match key_event {
-            KeyEvent::Pressed(Key::LeftShift) => self.shift_key_pressed = true,
-            KeyEvent::Released(Key::LeftShift) => self.shift_key_pressed = false,
-            KeyEvent::Pressed(Key::RightShift) => self.shift_key_pressed = true,
-            KeyEvent::Released(Key::RightShift) => self.shift_key_pressed = false,
-            KeyEvent::Pressed(Key::LeftCtrl) => self.control_key_pressed = true,
-            KeyEvent::Released(Key::LeftCtrl) => self.control_key_pressed = false,
-            KeyEvent::Pressed(Key::RightCtrl) => self.control_key_pressed = true,
-            KeyEvent::Released(Key::RightCtrl) => self.control_key_pressed = false,
-            KeyEvent::Pressed(Key::LeftAlt) => self.alt_key_pressed = true,
-            KeyEvent::Released(Key::LeftAlt) => self.alt_key_pressed = false,
-            KeyEvent::Pressed(Key::RightAlt) => self.alt_key_pressed = true,
-            KeyEvent::Released(Key::RightAlt) => self.alt_key_pressed = false,
-            KeyEvent::Pressed(Key::CapsLock) => self.caps_lock_active = !self.caps_lock_active,
+            KeyEvent::Pressed(Key::CapsLock) => {
+                self.caps_lock_active = !self.caps_lock_active;
+            }
             KeyEvent::Pressed(u) => {
+                println!("Cursor before: {:?}", self.cursor);
                 let action = self.interpret_key(u);
                 self.perform_action(action);
-            },
+            }
             KeyEvent::Released(_) => {}
         }
     }
@@ -55,16 +53,32 @@ impl Tty {
     pub fn perform_action(&mut self, action: KeyAction) {
         match action {
             KeyAction::Type(c) => {
-                self.writer.write_char(c);
-            },
+                let (col, row) = self.cursor;
+                self.current_prompt.push(c as u8);
+                self.writer.set_byte_at(c as u8, col, row, self.color_code);
+                self.cursor.0 += 1;
+            }
+            KeyAction::Backspace => {
+                let (col, row) = self.cursor;
+                if col == 0 {
+                    return;
+                }
+                self.cursor.0 -= 1;
+                self.current_prompt.remove(col - 1);
+                self.writer.clear_byte_at(col - 1, row);
+            }
+            KeyAction::ArrowLeft => {
+                println!("Cursor before: {:?}", self.cursor);
+                self.cursor.0 = self.cursor.0.saturating_sub(1);
+            }
             _ => {}
         }
     }
-    
+
     pub fn set_command_handler(&mut self, handler: Option<fn(&str)>) {
         self.command_handler = handler;
     }
-    
+
     fn interpret_key(&self, key: Key) -> KeyAction {
         match key {
             Key::Backspace => KeyAction::Backspace,
@@ -77,13 +91,15 @@ impl Tty {
             c => match c.to_ascii(self.is_uppercase()) {
                 Some(c) => KeyAction::Type(c as char), // todo review
                 None => KeyAction::Ignore,
-            }
-            _ => KeyAction::Ignore,
+            },
         }
     }
-    
+
     fn is_uppercase(&self) -> bool {
-        self.shift_key_pressed ^ self.caps_lock_active
+        let state = &self.keyboard_state;
+        state.is_pressed(Key::LeftShift)
+            || state.is_pressed(Key::RightShift)
+            || self.caps_lock_active
     }
 }
 
@@ -97,5 +113,6 @@ pub enum KeyAction {
     ArrowDown,
     ArrowLeft,
     ArrowRight,
-    Ignore
+    Ignore,
 }
+

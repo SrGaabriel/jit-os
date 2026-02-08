@@ -7,7 +7,6 @@ use crate::{
     serial::init_serial,
     tty::{
         Tty,
-        color::{Color, ColorCode},
         writer::TextWriter,
     },
 };
@@ -142,11 +141,11 @@ pub extern "C" fn _start(boot_info: *const BootInfo) -> ! {
     let text_writer = TextWriter::new_framebuffer_writer(
         fb_buffer,
         info.framebuffer.clone(),
-        ColorCode::new(Color::White, Color::Black),
     );
     let mut tty = Tty::new(text_writer, None);
     loop {
         if let Some(scancode) = pic::pop_scancode() {
+            println!("Scancode: {:#x}", scancode);
             tty.handle_input(scancode);
         }
     }

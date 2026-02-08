@@ -262,4 +262,124 @@ impl Key {
             _ => Key::Unknown(code),
         }
     }
+
+    pub fn to_scancode(&self) -> Option<u8> {
+        match self {
+            Key::Escape => Some(0x01),
+            Key::Num1 => Some(0x02),
+            Key::Num2 => Some(0x03),
+            Key::Num3 => Some(0x04),
+            Key::Num4 => Some(0x05),
+            Key::Num5 => Some(0x06),
+            Key::Num6 => Some(0x07),
+            Key::Num7 => Some(0x08),
+            Key::Num8 => Some(0x09),
+            Key::Num9 => Some(0x0A),
+            Key::Num0 => Some(0x0B),
+            Key::Minus => Some(0x0C),
+            Key::Equals => Some(0x0D),
+            Key::Backspace => Some(0x0E),
+            Key::Tab => Some(0x0F),
+            Key::Q => Some(0x10),
+            Key::W => Some(0x11),
+            Key::E => Some(0x12),
+            Key::R => Some(0x13),
+            Key::T => Some(0x14),
+            Key::Y => Some(0x15),
+            Key::U => Some(0x16),
+            Key::I => Some(0x17),
+            Key::O => Some(0x18),
+            Key::P => Some(0x19),
+            Key::LeftBracket => Some(0x1A),
+            Key::RightBracket => Some(0x1B),
+            Key::Enter => Some(0x1C),
+            Key::LeftCtrl => Some(0x1D),
+            Key::A => Some(0x1E),
+            Key::S => Some(0x1F),
+            Key::D => Some(0x20),
+            Key::F => Some(0x21),
+            Key::G => Some(0x22),
+            Key::H => Some(0x23),
+            Key::J => Some(0x24),
+            Key::K => Some(0x25),
+            Key::L => Some(0x26),
+            Key::Semicolon => Some(0x27),
+            Key::Quote => Some(0x28),
+            Key::Backtick => Some(0x29),
+            Key::LeftShift => Some(0x2A),
+            Key::Backslash => Some(0x2B),
+            Key::Z => Some(0x2C),
+            Key::X => Some(0x2D),
+            Key::C => Some(0x2E),
+            Key::V => Some(0x2F),
+            Key::B => Some(0x30),
+            Key::N => Some(0x31),
+            Key::M => Some(0x32),
+            Key::Comma => Some(0x33),
+            Key::Dot => Some(0x34),
+            Key::Slash => Some(0x35),
+            Key::RightShift => Some(0x36),
+            Key::LeftAlt => Some(0x38),
+            Key::Space => Some(0x39),
+            Key::CapsLock => Some(0x3A),
+            Key::F1 => Some(0x3B),
+            Key::F2 => Some(0x3C),
+            Key::F3 => Some(0x3D),
+            Key::F4 => Some(0x3E),
+            Key::F5 => Some(0x3F),
+            Key::F6 => Some(0x40),
+            Key::F7 => Some(0x41),
+            Key::F8 => Some(0x42),
+            Key::F9 => Some(0x43),
+            Key::F10 => Some(0x44),
+            Key::NumLock => Some(0x45),
+            Key::ScrollLock => Some(0x46),
+            Key::Home => Some(0x47),
+            Key::Up => Some(0x48),
+            Key::PageUp => Some(0x49),
+            Key::Left => Some(0x4B),
+            Key::Right => Some(0x4D),
+            Key::End => Some(0x4F),
+            Key::Down => Some(0x50),
+            Key::PageDown => Some(0x51),
+            Key::Insert => Some(0x52),
+            Key::Delete => Some(0x53),
+            Key::F11 => Some(0x57),
+            Key::F12 => Some(0x58),
+            _ => None, // todo: actually implement them all
+        }
+    }
+}
+
+pub struct KeyboardState(u128);
+
+impl KeyboardState {
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn update(&mut self, scancode: u8) {
+        let key = scancode & 0x7F;
+        if scancode & 0x80 == 0 {
+            self.press(key);
+        } else {
+            self.release(key);
+        }
+    }
+
+    pub fn press(&mut self, scancode: u8) {
+        self.0 |= 1u128 << scancode;
+    }
+
+    pub fn release(&mut self, scancode: u8) {
+        self.0 &= !(1u128 << scancode);
+    }
+
+    pub fn is_pressed(&self, key: Key) -> bool {
+        if let Some(scancode) = key.to_scancode() {
+            (self.0 & (1u128 << scancode)) != 0
+        } else {
+            false
+        }
+    }
 }

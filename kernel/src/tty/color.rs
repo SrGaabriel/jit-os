@@ -6,6 +6,12 @@ impl ColorCode {
     pub fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
+
+    pub fn flip(&self) -> ColorCode {
+        let fg = self.0 & 0x0F;
+        let bg = (self.0 & 0xF0) >> 4;
+        ColorCode((fg << 4) | bg)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

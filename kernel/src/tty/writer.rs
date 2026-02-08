@@ -1,26 +1,15 @@
-use crate::{FramebufferInfo, tty::color::Color};
 use super::{color::ColorCode, font::FONT8X8_BASIC_FLATTENED};
-use core::fmt;
+use crate::{FramebufferInfo, tty::color::Color};
 
 pub struct TextWriter {
-    column_position: usize,
-    row_position: usize,
-    color_code: ColorCode,
     buffer: &'static mut [u8],
     info: FramebufferInfo,
     font: &'static [u8],
 }
 
 impl TextWriter {
-    pub fn new_framebuffer_writer(
-        buffer: &'static mut [u8],
-        info: FramebufferInfo,
-        color_code: ColorCode,
-    ) -> TextWriter {
+    pub fn new_framebuffer_writer(buffer: &'static mut [u8], info: FramebufferInfo) -> TextWriter {
         let mut writer = TextWriter {
-            column_position: 0,
-            row_position: 0,
-            color_code,
             buffer,
             info,
             font: FONT8X8_BASIC_FLATTENED.as_slice(),
@@ -82,8 +71,6 @@ impl TextWriter {
             );
             self.buffer[clear_start..clear_end].fill(0);
         }
-
-        self.row_position -= line_count;
     }
 
     pub fn clear_screen(&mut self) {
@@ -92,9 +79,6 @@ impl TextWriter {
 
         let clear_size = core::cmp::min(total_size, self.buffer.len());
         self.buffer[0..clear_size].fill(0);
-
-        self.column_position = 0;
-        self.row_position = 0;
     }
 
     fn color_to_rgb(&self, color: ColorCode) -> (u8, u8, u8) {
@@ -118,51 +102,34 @@ impl TextWriter {
         }
     }
 
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.column_position >= self.info.width() - 8 {
-                    self.new_line();
+    pub fn set_byte_at(&mut self, byte: u8, col: usize, row: usize, color_code: ColorCode) {
+        self.set_byte(byte, col * 8, row * 8, color_code);
+    }
+
+    fn set_byte(&mut self, byte: u8, col: usize, row: usize, color_code: ColorCode) {
+        let char_idx = byte as usize * 8;
+        let font_char = &self.font[char_idx..char_idx + 8];
+        let color = self.color_to_rgb(color_code);
+
+        for (y, &row_data) in font_char.iter().enumerate() {
+            for x in 0..8 {
+                if (row_data >> x) & 1 == 1 {
+                    self.write_pixel(col + x, row + y, color);
                 }
-
-                let char_idx = byte as usize * 8;
-                let font_char = &self.font[char_idx..char_idx + 8];
-                let color = self.color_to_rgb(self.color_code);
-
-                for (y, &row) in font_char.iter().enumerate() {
-                    for x in 0..8 {
-                        if (row >> (7 - x)) & 1 == 1 {
-                            self.write_pixel(
-                                self.column_position + x,
-                                self.row_position + y,
-                                color,
-                            );
-                        }
-                    }
-                }
-
-                self.column_position += 8;
             }
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
+    fn clear_byte(&mut self, col: usize, row: usize) {
+        for y in 0..8 {
+            for x in 0..8 {
+                self.write_pixel(col + x, row + y, (0, 0, 0));
             }
         }
     }
 
-    pub fn new_line(&mut self) {
-        self.row_position += 8;
-        self.column_position = 0;
-
-        if self.row_position >= self.info.height() - 8 {
-            self.scroll_up();
-        }
+    pub fn clear_byte_at(&mut self, col: usize, row: usize) {
+        self.clear_byte(col * 8, row * 8);
     }
 
     pub fn clear_last_line(&mut self) {
@@ -173,12 +140,5 @@ impl TextWriter {
         if end <= self.buffer.len() {
             self.buffer[start..end].fill(0);
         }
-    }
-}
-
-impl fmt::Write for TextWriter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
     }
 }
